@@ -138,51 +138,10 @@ def generate_acl_diff(proposed, revisioned):
   return acl_dict
 
 
-def populate_cavs(custom_attribute_values, custom_attributes, cads):
-  """Required only for oldstyle api.
-
-  FE send custom_attributes and expected workflow same as
-  custom_attribute_values.
-  If custom_attribute_values == custom_attributes. This is revision.
-  Just return custom_attribute_values.
-  if not generate new custom_attribute_values from custom_attributes.
-  This function should be removed after FE will be moved to new api.
-  """
-  # custom_attributes same as custom_attribute_values in revisions
-  # custom_attributes empty on new api
-  # in all that cases you shoul return custom_attribute_values
-  if not custom_attributes or custom_attributes == custom_attribute_values:
-    return custom_attribute_values
-  custom_attributes = {int(k): v for k, v in custom_attributes.iteritems()}
-  cavs = []
-  for cad in cads:
-    if cad.id not in custom_attributes:
-      continue
-    object_type = cad.attribute_type[4:].strip()
-    if cad.attribute_type.startswith("Map:"):
-      object_id = custom_attributes[cad.id].split(":", 1)[1].strip()
-      object_id = None if object_id == 'None' else int(object_id)
-      cavs.append({
-          "attribute_value": object_type,
-          "attribute_object_id": object_id,
-          "custom_attribute_id": cad.id,
-      })
-    else:
-      cavs.append({
-          "attribute_value": custom_attributes[cad.id],
-          "custom_attribute_id": cad.id,
-          "attribute_object_id": None,
-      })
-  return cavs
-
-
 def generate_cav_diff(instance, proposed, revisioned, old_style_cavs):
   """Build diff for custom attributes."""
   if not isinstance(instance, mixins.customattributable.CustomAttributable):
     return {}
-  proposed = populate_cavs(proposed,
-                           old_style_cavs,
-                           instance.custom_attribute_definitions)
   diff = {}
   remove_cav = bool(old_style_cavs is not None and proposed != old_style_cavs)
   proposed_cavs = {
