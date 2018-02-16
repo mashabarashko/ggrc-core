@@ -456,42 +456,6 @@ class TestProposalApi(TestCase):
       self.assertEqual("Person", cav.attribute_value)
       self.assertIsNone(cav.attribute_object_id)
 
-  def test_change_cad_oldstile(self):
-    """Test create CAVs proposal in old style."""
-    with factories.single_commit():
-      control = factories.ControlFactory(title="1")
-      cad = factories.CustomAttributeDefinitionFactory(
-          definition_type="control")
-      factories.CustomAttributeValueFactory(
-          custom_attribute=cad,
-          attributable=control,
-          attribute_value="123")
-    control_id = control.id
-    cad_id = cad.id
-    data = control.log_json()
-    data["custom_attributes"] = {cad.id: "321"}
-    resp = self.api.post(
-        all_models.Proposal,
-        {"proposal": {
-            "instance": {
-                "id": control.id,
-                "type": control.type,
-            },
-            # "content": {"123": 123},
-            "full_instance_content": data,
-            "agenda": "update cav",
-            "context": None,
-        }})
-    self.assertEqual(201, resp.status_code)
-    control = all_models.Control.query.get(control_id)
-    self.assertEqual(1, len(control.proposals))
-    self.assertIn("custom_attribute_values", control.proposals[0].content)
-    self.assertEqual({unicode(cad_id): {"attribute_value": u"321",
-                                        "attribute_object": None,
-                                        "remove_cav": True}},
-                     control.proposals[0].content["custom_attribute_values"])
-    self.assertEqual(1, len(control.comments))
-
   def test_change_mapping(self):
     """Test create mapping proposal."""
     setuped_kind, update_kind = all_models.Option.query.filter(
