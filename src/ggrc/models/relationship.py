@@ -117,6 +117,7 @@ class Relationship(Base, db.Model):
     return "{}:{} <-> {}:{}".format(self.source_type, self.source_id,
                                     self.destination_type, self.destination_id)
 
+
   def validate_relatable_type(self, field, value):
     if value is None:
       raise ValidationError(u"{}.{} can't be None."
