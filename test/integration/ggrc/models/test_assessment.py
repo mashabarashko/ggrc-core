@@ -5,6 +5,7 @@
 
 import collections
 import datetime
+from threading import Thread
 
 import freezegun
 import ddt
@@ -21,10 +22,17 @@ from integration.ggrc.models.test_assessment_base import TestAssessmentBase
 
 from appengine import base
 
+from ggrc.models.assessment import Assessment
+
 
 class TestAssessment(TestAssessmentBase):
   """Assessment test cases"""
   # pylint: disable=invalid-name
+  def setUp(self):
+    """Set up for test cases."""
+    super(TestAssessment, self).setUp()
+    self.client.get("/login")
+
   def test_auto_slug_generation(self):
     """Test auto slug generation"""
     factories.AssessmentFactory(title="Some title")
@@ -430,6 +438,41 @@ class TestAssessment(TestAssessmentBase):
         # Mapped Assignee roles should be created for all snapshots, not only
         # for control that related to assessment
         self.assert_mapped_role(role, person_email, snapshot)
+
+  def test_assessment_filter(self):
+    """Update assessment in parallel. Status should be changed
+    in appropriate order."""
+    def _change_assessment(assessment, data):
+      """Send request to change status."""
+      self.api.put(assessment, data)
+
+    audit = factories.AuditFactory()
+    asmnt = factories.AssessmentFactory(audit=audit)
+
+    threads = [Thread(target=_change_assessment,
+                          args=(asmnt, {"actions": {"add_related": [
+                            {
+                              "id": None,
+                              "type": "Document",
+                              "link": "google.com",
+                              "title": "google.com",
+                              "document_type": "URL",
+                            }
+                          ]}})),
+               Thread(target=_change_assessment,args=(asmnt, {"status": "Deprecated"}))
+               ]
+
+    threads[0].start()
+
+    import time
+    time.sleep(0.003)
+
+    threads[1].start()
+    for t in threads:
+      t.join()
+    db.session.commit()
+    asmnt = Assessment.query.filter().first()
+    self.assertEqual(asmnt.status, "Deprecated")
 
 
 @ddt.ddt
