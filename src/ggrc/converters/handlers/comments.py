@@ -5,10 +5,12 @@
 
 from ggrc import db
 
+from sqlalchemy import orm
+
 from ggrc.converters import errors
 from ggrc.converters.handlers.handlers import ColumnHandler
 from ggrc.models import all_models
-from ggrc.login import get_current_user_id
+from ggrc.login import get_current_user, get_current_user_id
 
 
 class CommentColumnHandler(ColumnHandler):
@@ -41,13 +43,46 @@ class CommentColumnHandler(ColumnHandler):
   def get_value(self):
     return ""
 
+  @staticmethod
+  def _get_assignees(object_id, object_type, user_id):
+    """Getting object roles of the comment's author.
+
+    Args:
+      object_id: id of imported object
+      object_type: type of imported object
+      user_id: id of the comment's author
+    Returns:
+      list of roles' names
+    """
+    acl = db.session.query(all_models.AccessControlList).options(
+        orm.joinedload('ac_role'),
+        orm.joinedload('person'),
+    ).filter(
+        all_models.AccessControlList.object_id == object_id,
+        all_models.AccessControlList.object_type == object_type,
+        all_models.AccessControlList.person_id == user_id
+    ).all()
+
+    assignees = []
+    for item in acl:
+      if not item.ac_role.internal:
+        assignees.append(item.ac_role.name)
+
+    return assignees
+
   def set_obj_attr(self):
     """ Create comments """
     if self.dry_run or not self.value:
       return
     current_obj = self.row_converter.obj
     for description in self.value:
+      current_user = get_current_user()
+      assignees = self._get_assignees(current_obj.id, current_obj.type,
+                                      current_user.id)
+      assignee_type = ",".join(assignees) or None
+
       comment = all_models.Comment(description=description,
+                                   assignee_type=assignee_type,
                                    modified_by_id=get_current_user_id())
       db.session.add(comment)
       mapping = all_models.Relationship(source=current_obj,

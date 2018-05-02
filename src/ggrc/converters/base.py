@@ -86,6 +86,10 @@ class ImportConverter(BaseConverter):
       "audit",
   ]
 
+  secondary_objects = [
+    "comments",
+  ]
+
   def initialize_block_converters(self):
     """ Initialize block converters.
 
@@ -114,6 +118,7 @@ class ImportConverter(BaseConverter):
     self.row_converters_from_csv()
     self.handle_priority_columns()
     self.import_objects()
+    self.import_mapped_objects()
     self.import_secondary_objects()
     self._start_compute_attributes_job()
     self.drop_cache()
@@ -124,7 +129,7 @@ class ImportConverter(BaseConverter):
 
   def handle_priority_columns(self):
     for block_converter in self.block_converters:
-      block_converter.handle_row_data(self.priority_columns)
+      block_converter.handle_row_data(field_list=self.priority_columns)
 
   def import_objects(self):
     for converter in self.block_converters:
@@ -146,6 +151,26 @@ class ImportConverter(BaseConverter):
           revision_ids,
           cur_user.id
       )
+
+  def import_objects(self):
+    """Import objects with their primary attributes"""
+    for converter in self.block_converters:
+      converter.handle_row_data(ignore_list=self.secondary_objects)
+      converter.import_objects()
+
+  def import_mapped_objects(self):
+    """Import objects' mappings"""
+    for converter in self.block_converters:
+      converter.import_mapped_objects()
+
+  def import_secondary_objects(self):
+    """Import object which need to be imported after all mappings and other
+    objects"""
+    for converter in self.block_converters:
+      converter.handle_secondary_objects_data(
+        field_list=self.secondary_objects)
+      converter.import_secondary_objects(
+        field_list=self.secondary_objects)
 
 
 class ExportConverter(BaseConverter):
