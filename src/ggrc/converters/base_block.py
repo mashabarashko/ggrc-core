@@ -19,6 +19,7 @@ from sqlalchemy import and_
 from sqlalchemy.orm.exc import UnmappedInstanceError
 from flask import _app_ctx_stack
 
+import ggrc.services
 from ggrc import db
 from ggrc import models
 from ggrc.rbac import permissions
@@ -624,9 +625,23 @@ class BlockConverter(object):
     """Import secondary objects procedure."""
     if self.ignore:
       return
+    new_objects = []
     for row_converter in self.row_converters:
       row_converter.setup_secondary_objects(field_list)
       if not self.converter.dry_run:
+        # sending model_posted signals for secondary
+        # objects (Comments, Relationships)
+        for obj in db.session.new:
+          new_objects.append(obj)
+          object_class = obj.__class__
+          service_class = getattr(ggrc.services, object_class.__name__)
+          service_class.model = object_class
+          signals.Restful.model_posted.send(
+              object_class,
+              obj=obj,
+              src={},
+              service=service_class
+          )
         try:
           db.session.flush()
         except exc.SQLAlchemyError as err:
@@ -634,6 +649,7 @@ class BlockConverter(object):
           logger.exception("Import failed with: %s", err.message)
           row_converter.add_error(errors.UNKNOWN_ERROR)
     if not self.converter.dry_run:
+      self.send_collection_post_signals(new_objects)
       self.save_import()
 
   def clean_session_from_ignored_objs(self):
