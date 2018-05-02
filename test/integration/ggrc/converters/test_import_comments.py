@@ -6,7 +6,9 @@
 import ddt
 
 from integration.ggrc import TestCase
+from integration.ggrc.models import factories
 from ggrc.models import Assessment
+from ggrc import app
 
 
 @ddt.ddt
@@ -16,6 +18,11 @@ class TestCommentsImport(TestCase):
   @classmethod
   def setUpClass(cls):
     TestCase.clear_data()
+    with app.app.app_context():
+      factories.AccessControlRoleFactory(
+          name='Custom Role',
+          object_type='Assessment',
+      )
     cls.response = TestCase._import_file("import_comments.csv")
 
   def setUp(self):
@@ -35,3 +42,12 @@ class TestCommentsImport(TestCase):
     asst = Assessment.query.filter_by(slug=slug).first()
     comments = [comment.description for comment in asst.comments]
     self.assertEqual(comments, expected_comments)
+
+  def test_author_role_in_comment(self):
+    """Test comment author's role is set correctly on import"""
+    slug = "Assessment 1"
+    asmt = Assessment.query.filter_by(slug=slug).first()
+    comment = asmt.comments[0]
+    self.assertIn("Assignees", comment.assignee_type)
+    self.assertIn("Creators", comment.assignee_type)
+    self.assertIn("Custom Role", comment.assignee_type)
