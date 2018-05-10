@@ -96,12 +96,13 @@ export default can.Component.extend({
             context: context,
             assignee_type: GGRC.Utils.getAssigneeType(instance),
             custom_attribute_revision_upd: {
-              custom_attribute_value: {
-                id: this.attr('content.contextScope.valueId')(),
-              },
               custom_attribute_definition: {
                 id: this.attr('content.contextScope.id'),
               },
+	      attributable: {
+		id: instance.attr('id'),
+		type: instance.attr('type'),
+	      },
             },
           });
         });

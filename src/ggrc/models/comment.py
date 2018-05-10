@@ -16,8 +16,9 @@ from werkzeug.exceptions import BadRequest
 
 from ggrc import builder
 from ggrc import db
+from ggrc.models import revision
+from ggrc.models import custom_attribute_value
 from ggrc.models.deferred import deferred
-from ggrc.models.revision import Revision
 from ggrc.models.mixins import Base
 from ggrc.models.mixins import Described
 from ggrc.models.mixins import Notifiable
@@ -287,37 +288,55 @@ class Comment(Roleable, Relatable, Described, Notifiable,
     ca_revision_dict = value.get('custom_attribute_revision_upd')
     if not ca_revision_dict:
       return
-    ca_val_dict = self._get_ca_value(ca_revision_dict)
+    cad_id, parent_type, parent_id = self._get_ca_value(ca_revision_dict)
 
-    ca_val_id = ca_val_dict['id']
-    ca_val_revision = Revision.query.filter_by(
-        resource_type='CustomAttributeValue',
-        resource_id=ca_val_id,
+    rev, cav = revision.Revision, custom_attribute_value.CustomAttributeValue
+
+    self.revision_id = db.session.query(
+        rev.id,
+    ).join(
+        cav,
+        sa.and_(
+            rev.resource_type == cav.__name__,
+            rev.resource_id == cav.id,
+        ),
+    ).filter(
+        cav.custom_attribute_id == cad_id,
+        cav.attributable_type == parent_type,
+        cav.attributable_id == parent_id,
     ).order_by(
-        Revision.created_at.desc(),
-    ).limit(1).first()
-    if not ca_val_revision:
-      raise BadRequest("No Revision found for CA value with id provided under "
-                       "'custom_attribute_value': {}"
-                       .format(ca_val_dict))
+        rev.id.desc(),
+    ).limit(1).scalar()
 
-    self.revision_id = ca_val_revision.id
-    self.custom_attribute_definition_id = ca_val_revision.content.get(
-        'custom_attribute_id',
-    )
+    if not self.revision_id:
+      raise BadRequest("No Revision found for CA value for CAD.id {} for {} "
+                       "with id {}"
+                       .format(cad_id, parent_type, parent_id))
+
+    self.custom_attribute_definition_id = cad_id
 
   @staticmethod
   def _get_ca_value(ca_revision_dict):
-    """Get CA value dict from json and do a basic validation."""
-    ca_val_dict = ca_revision_dict.get('custom_attribute_value')
-    if not ca_val_dict:
-      raise ValueError("CA value expected under "
-                       "'custom_attribute_value': {}"
+    """Get data to identify a CAV from json and do a basic validation.
+
+    Returns: a tuple of CAD.id, CAV.attributable_type, CAV.attributable_id
+    """
+    try:
+      cad_id = ca_revision_dict["custom_attribute_definition"]["id"]
+      assert cad_id is not None
+    except (KeyError, AssertionError):
+      raise ValueError("CA definition id expected under "
+                       "'custom_attribute_definition.id': {}"
                        .format(ca_revision_dict))
-    if not ca_val_dict.get('id'):
-      raise ValueError("CA value id expected under 'id': {}"
-                       .format(ca_val_dict))
-    return ca_val_dict
+
+    try:
+      parent_stub = ca_revision_dict["attributable"]
+      parent_id, parent_type = parent_stub["id"], parent_stub["type"]
+      assert None not in {parent_id, parent_type}
+    except (KeyError, AssertionError):
+      raise ValueError("Attributable stub expected under 'attributable': {}"
+                       .format(ca_revision_dict))
+    return cad_id, parent_type, parent_id
 
 
 class CommentInitiator(object):  # pylint: disable=too-few-public-methods
