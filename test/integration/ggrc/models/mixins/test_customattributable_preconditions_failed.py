@@ -245,11 +245,15 @@ class TestPreconditionsFailed(TestCase):
         description="Mandatory comment",
     )
     comment.custom_attribute_revision_upd({
-        "custom_attribute_revision_upd": {
-            "custom_attribute_value": {
-                "id": ca.value.id,
+        "custom_attribute_revision_upd":{
+            "custom_attribute_definition": {
+                "id": ca.definition.id
             },
-        },
+            "attributable": {
+                "id": self.assessment.id,
+                "type": "Assessment",
+            },
+        }
     })
     factories.RelationshipFactory(
         source=self.assessment,
@@ -373,11 +377,15 @@ class TestPreconditionsPassed(TestCase):
         description="Mandatory comment",
     )
     comment.custom_attribute_revision_upd({
-        "custom_attribute_revision_upd": {
-            "custom_attribute_value": {
-                "id": ca.value.id,
+        "custom_attribute_revision_upd":{
+            "custom_attribute_definition": {
+                "id": ca.definition.id
             },
-        },
+            "attributable": {
+                "id": self.assessment.id,
+                "type": "Assessment",
+            },
+        }
     })
     factories.RelationshipFactory(
         source=self.assessment,

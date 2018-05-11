@@ -157,10 +157,17 @@ class AssessmentRBACFactory(base.BaseRBACFactory):
     return self.api.put(assessment, {
         "actions": {
             "add_related": [{
-                "id": None,
                 "type": "Comment",
                 "description": factories.random_str(),
-                "custom_attribute_definition_id": None,
+                "assignee_type": None,
+                "context": None,
+                "custom_attribute_revision_upd": {
+                    "custom_attribute_definition": None,
+                    "attributable": {
+                        "id": assessment,
+                        "type": "Assessment",
+                    },
+                },
             }]
         }
     })

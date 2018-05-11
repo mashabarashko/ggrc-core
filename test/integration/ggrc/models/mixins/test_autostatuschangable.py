@@ -696,10 +696,11 @@ class TestOther(TestMixinAutoStatusChangeableBase):
     response = self.api.put(assessment, {
         'actions': {
             'add_related': [{
-                'id': None,
-                'type': 'Comment',
-                'description': 'comment',
-                'custom_attribute_definition_id': None,
+                "type": "Comment",
+                "description": "comment",
+                "assignee_type": None,
+                "context": None,
+                "custom_attribute_revision_upd": None,
             }]
         }
     })

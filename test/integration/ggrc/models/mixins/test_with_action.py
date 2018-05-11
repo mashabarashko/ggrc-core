@@ -499,10 +499,11 @@ class TestCommentWithActionMixin(TestCase):
 
     response = self.api.put(assessment, {"actions": {"add_related": [
         {
-            "id": None,
             "type": "Comment",
             "description": "comment",
-            "custom_attribute_definition_id": None,
+            "assignee_type": None,
+            "context": None,
+            "custom_attribute_revision_upd": None,
         }
     ]}})
     self.assert200(response)
@@ -526,10 +527,19 @@ class TestCommentWithActionMixin(TestCase):
     )
     response = self.api.put(assessment, {"actions": {"add_related": [
         {
-            "id": None,
             "type": "Comment",
             "description": "comment",
-            "custom_attribute_definition_id": ca_def.id,
+            "assignee_type": None,
+            "context": None,
+            "custom_attribute_revision_upd": {
+                "custom_attribute_definition": {
+                    "id": ca_def.id
+                },
+                "attributable": {
+                    "id": assessment.id,
+                    "type": "Assessment",
+                },
+            },
         }
     ]}})
     self.assert200(response)
@@ -551,9 +561,18 @@ class TestCommentWithActionMixin(TestCase):
           multi_choice_options="no,yes",
       )
     data = {
-        u"id": None,
         u"type": u"Comment",
-        u"custom_attribute_definition_id": int(ca_def.id),
+        u"assignee_type": None,
+        u"context": None,
+        u"custom_attribute_revision_upd": {
+            u"custom_attribute_definition": {
+                u"id": int(ca_def.id)
+            },
+            u"attributable": {
+                u"id": int(assessment.id),
+                u"type": u"Assessment",
+            },
+        },
     }
     response = self.api.put(assessment, {"actions": {"add_related": [data]}})
     self.assert400(response)
@@ -566,7 +585,6 @@ class TestCommentWithActionMixin(TestCase):
     assessment = factories.AssessmentFactory()
     response = self.api.put(assessment, {"actions": {"add_related": [
         {
-            "id": None,
             "type": "Comment",
         }
     ]}})
@@ -718,10 +736,19 @@ class TestMultiplyActions(TestCase, WithQueryApi):
                 "type": "Document",
             },
             {
-                "id": None,
                 "type": "Comment",
                 "description": "comment1",
-                "custom_attribute_definition_id": ca_def.id,
+                "assignee_type": None,
+                "context": None,
+                "custom_attribute_revision_upd": {
+                    "custom_attribute_definition": {
+                        "id": ca_def.id
+                    },
+                    "attributable": {
+                        "id": assessment,
+                        "type": "Assessment",
+                    },
+                },
             }
         ], "remove_related": [
             {
