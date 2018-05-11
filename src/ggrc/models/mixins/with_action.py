@@ -201,10 +201,11 @@ class WithAction(object):
   class CommentAction(BaseAction):
     """Comment action"""
 
-    AddRelated = namedtuple("AddRelated", ["id",
-                                           "type",
+    AddRelated = namedtuple("AddRelated", ["type",
                                            "description",
-                                           "custom_attribute_definition_id"])
+                                           "context",
+                                           "assignee_type",
+                                           "custom_attribute_revision_upd"])
 
     def _create(self, parent, action):
       # get assignee type
@@ -212,7 +213,14 @@ class WithAction(object):
       assignee_types = parent.assignees.get(current_user, [])
       assignee_type = ",".join(assignee_types) or None
       # create object
-      cad_id = action.custom_attribute_definition_id
+      cad_id = None
+      custom_attribute_revision_upd = getattr(action,
+                                              "custom_attribute_revision_upd",
+                                              None)
+      if custom_attribute_revision_upd:
+        cad = custom_attribute_revision_upd.get('custom_attribute_definition')
+        if cad:
+          cad_id = cad.get("id")
       if not cad_id:
         obj = Comment(description=action.description,
                       assignee_type=assignee_type,
