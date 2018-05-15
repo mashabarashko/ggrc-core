@@ -87,7 +87,7 @@ class ImportConverter(BaseConverter):
   ]
 
   secondary_objects = [
-    "comments",
+      "comments",
   ]
 
   def initialize_block_converters(self):
@@ -131,15 +131,6 @@ class ImportConverter(BaseConverter):
     for block_converter in self.block_converters:
       block_converter.handle_row_data(field_list=self.priority_columns)
 
-  def import_objects(self):
-    for converter in self.block_converters:
-      converter.handle_row_data()
-      converter.import_objects()
-
-  def import_secondary_objects(self):
-    for block_converter in self.block_converters:
-      block_converter.import_secondary_objects()
-
   def _start_compute_attributes_job(self):
     revision_ids = []
     for block_converter in self.block_converters:
@@ -168,9 +159,9 @@ class ImportConverter(BaseConverter):
     objects"""
     for converter in self.block_converters:
       converter.handle_secondary_objects_data(
-        field_list=self.secondary_objects)
+          field_list=self.secondary_objects)
       converter.import_secondary_objects(
-        field_list=self.secondary_objects)
+          field_list=self.secondary_objects)
 
 
 class ExportConverter(BaseConverter):
