@@ -22,10 +22,8 @@ class RowConverter(object):
 
   def __init__(self, block_converter, object_class, **options):
     self.block_converter = block_converter
-    self.options = options.copy()
     self.object_class = object_class
     self.obj = options.get("obj")
-    self.from_ids = self.obj is not None
     self.is_new = True
     self.is_delete = False
     self.is_deprecated = False
@@ -39,7 +37,6 @@ class RowConverter(object):
     self.line = self.index + self.block_converter.offset +\
         self.block_converter.BLOCK_OFFSET
     self.headers = options.get("headers", [])
-    self.old_values = {}
     self.initial_state = None
 
   def add_error(self, template, **kwargs):
