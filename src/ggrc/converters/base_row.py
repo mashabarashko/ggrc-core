@@ -20,23 +20,24 @@ from ggrc.utils import dump_attrs
 class RowConverter(object):
   """Base class for handling row data."""
 
-  def __init__(self, block_converter, object_class, **options):
+  def __init__(self, block_converter, object_class, headers, index, **options):
     self.block_converter = block_converter
     self.object_class = object_class
+    self.headers = headers
+    self.index = index
+
     self.obj = options.get("obj")
     self.is_new = True
     self.is_delete = False
     self.is_deprecated = False
     self.do_not_expunge = False
     self.ignore = False
-    self.index = options.get("index", -1)
     self.row = options.get("row", [])
     self.attrs = collections.OrderedDict()
     self.objects = collections.OrderedDict()
     self.id_key = ""
     self.line = self.index + self.block_converter.offset +\
         self.block_converter.BLOCK_OFFSET
-    self.headers = options.get("headers", [])
     self.initial_state = None
 
   def add_error(self, template, **kwargs):
