@@ -312,3 +312,11 @@ class RowConverter(object):
       value = field_handler.get_value() if field_handler else ""
       row.append(value or "")
     return row
+
+
+class ImportRowConverter(RowConverter):
+  pass
+
+
+class ExportRowConverter(RowConverter):
+  pass

@@ -28,7 +28,7 @@ from ggrc.utils import list_chunks
 from ggrc.converters import errors
 from ggrc.converters import get_shared_unique_rules
 from ggrc.converters import pre_commit_checks
-from ggrc.converters.base_row import RowConverter
+from ggrc.converters import base_row
 from ggrc.converters.import_helper import get_column_order
 from ggrc.converters.import_helper import get_object_column_definitions
 from ggrc.services.common import get_modified_objects
@@ -459,8 +459,8 @@ class BlockConverter(object):
       return
     self.row_converters = []
     for i, row in enumerate(self.rows):
-      row = RowConverter(self, self.object_class, row=row,
-                         headers=self.headers, index=i)
+      row = base_row.ImportRowConverter(self, self.object_class, row=row,
+                                        headers=self.headers, index=i)
       self.row_converters.append(row)
 
   def row_converters_from_ids(self):
@@ -480,8 +480,8 @@ class BlockConverter(object):
       ).execution_options(stream_results=True)
 
       for obj in objects:
-        yield RowConverter(self, self.object_class, obj=obj,
-                           headers=self.headers, index=index)
+        yield base_row.ExportRowConverter(self, self.object_class, obj=obj,
+                                          headers=self.headers, index=index)
         index += 1
 
       # Clear all objects from session (it helps to avoid memory leak)
