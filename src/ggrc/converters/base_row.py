@@ -20,24 +20,63 @@ from ggrc.utils import dump_attrs
 class RowConverter(object):
   """Base class for handling row data."""
 
-  def __init__(self, block_converter, object_class, headers, index, **options):
+  def __init__(self, block_converter, object_class, headers, options):
     self.block_converter = block_converter
     self.object_class = object_class
     self.headers = headers
-    self.index = index
-
     self.obj = options.get("obj")
+    self.attrs = collections.OrderedDict()
+    self.objects = collections.OrderedDict()
+
+  def handle_obj_row_data(self):
+    for attr_name, header_dict in self.headers.items():
+      handler = header_dict["handler"]
+      item = handler(self, attr_name, **header_dict)
+      if header_dict.get("type") == AttributeInfo.Type.PROPERTY:
+        self.attrs[attr_name] = item
+      else:
+        self.objects[attr_name] = item
+
+  def to_array(self, fields):
+    """Get an array representation of the current row.
+
+    Fiter the values to match the fields array and return the string
+    representation of the values.
+
+    Args:
+      fields (list of strings): A list of columns that will be included in the
+        output array. This is basically a filter of all possible fields that
+        this row contains.
+
+    Returns:
+      list of strings where each cell contains a string value of the
+      coresponding field.
+    """
+    row = []
+    for field in fields:
+      field_type = self.headers.get(field, {}).get("type")
+      if field_type == AttributeInfo.Type.PROPERTY:
+        field_handler = self.attrs.get(field)
+      else:
+        field_handler = self.objects.get(field)
+      value = field_handler.get_value() if field_handler else ""
+      row.append(value or "")
+    return row
+
+
+class ImportRowConverter(RowConverter):
+  def __init__(self, block_converter, object_class, headers, index, **options):
+    super(ImportRowConverter, self).__init__(block_converter, object_class, headers, options)
+    self.index = index
     self.is_new = True
     self.is_delete = False
     self.is_deprecated = False
     self.do_not_expunge = False
     self.ignore = False
     self.row = options.get("row", [])
-    self.attrs = collections.OrderedDict()
-    self.objects = collections.OrderedDict()
     self.id_key = ""
-    self.line = self.index + self.block_converter.offset +\
-        self.block_converter.BLOCK_OFFSET
+    self.line = self.index + self.block_converter.offset + \
+                self.block_converter.BLOCK_OFFSET
     self.initial_state = None
 
   def add_error(self, template, **kwargs):
@@ -67,8 +106,8 @@ class RowConverter(object):
     handle_fields = self.headers if field_list is None else field_list
     for i, (attr_name, header_dict) in enumerate(self.headers.items()):
       if attr_name not in handle_fields or \
-              attr_name in self.attrs or \
-              self.is_delete:
+        attr_name in self.attrs or \
+        self.is_delete:
         continue
       handler = header_dict["handler"]
       item = handler(self, attr_name, parse=True,
@@ -80,22 +119,13 @@ class RowConverter(object):
       if not self.ignore:
         if attr_name == "status" and hasattr(self.obj, "DEPRECATED"):
           self.is_deprecated = (
-              self.obj.DEPRECATED == item.value != self.obj.status
+            self.obj.DEPRECATED == item.value != self.obj.status
           )
         if attr_name in ("slug", "email"):
           self.id_key = attr_name
           self.obj = self.get_or_generate_object(attr_name)
           item.set_obj_attr()
       item.check_unique_consistency()
-
-  def handle_obj_row_data(self):
-    for attr_name, header_dict in self.headers.items():
-      handler = header_dict["handler"]
-      item = handler(self, attr_name, **header_dict)
-      if header_dict.get("type") == AttributeInfo.Type.PROPERTY:
-        self.attrs[attr_name] = item
-      else:
-        self.objects[attr_name] = item
 
   def handle_row_data(self, field_list=None):
     """Handle row data on import"""
@@ -215,15 +245,15 @@ class RowConverter(object):
     service_class.model = self.object_class
     if self.is_delete:
       signals.Restful.model_deleted_after_commit.send(
-          self.object_class, obj=self.obj, service=service_class, event=event)
+        self.object_class, obj=self.obj, service=service_class, event=event)
     elif self.is_new:
       signals.Restful.model_posted_after_commit.send(
-          self.object_class, obj=self.obj, src={}, service=service_class,
-          event=event)
+        self.object_class, obj=self.obj, src={}, service=service_class,
+        event=event)
     else:
       signals.Restful.model_put_after_commit.send(
-          self.object_class, obj=self.obj, src={}, service=service_class,
-          event=event)
+        self.object_class, obj=self.obj, src={}, service=service_class,
+        event=event)
 
   def send_before_commit_signals(self, event=None):
     """Send before commit signals for all objects.
@@ -239,8 +269,8 @@ class RowConverter(object):
     service_class = getattr(ggrc.services, self.object_class.__name__)
     service_class.model = self.object_class
     signals.Restful.model_put_before_commit.send(
-        self.object_class, obj=self.obj, src={}, service=service_class,
-        event=event, initial_state=self.initial_state)
+      self.object_class, obj=self.obj, src={}, service=service_class,
+      event=event, initial_state=self.initial_state)
 
   def send_pre_commit_signals(self):
     """Send before commit signals for all objects.
@@ -256,13 +286,13 @@ class RowConverter(object):
     service_class.model = self.object_class
     if self.is_delete:
       signals.Restful.model_deleted.send(
-          self.object_class, obj=self.obj, service=service_class)
+        self.object_class, obj=self.obj, service=service_class)
     elif self.is_new:
       signals.Restful.model_posted.send(
-          self.object_class, obj=self.obj, src={}, service=service_class)
+        self.object_class, obj=self.obj, src={}, service=service_class)
     else:
       signals.Restful.model_put.send(
-          self.object_class, obj=self.obj, src={}, service=service_class)
+        self.object_class, obj=self.obj, src={}, service=service_class)
 
   def insert_object(self):
     """Add the row object to the current database session."""
@@ -285,36 +315,7 @@ class RowConverter(object):
     for secondery_object in self.objects.values():
       secondery_object.insert_object()
 
-  def to_array(self, fields):
-    """Get an array representation of the current row.
-
-    Fiter the values to match the fields array and return the string
-    representation of the values.
-
-    Args:
-      fields (list of strings): A list of columns that will be included in the
-        output array. This is basically a filter of all possible fields that
-        this row contains.
-
-    Returns:
-      list of strings where each cell contains a string value of the
-      coresponding field.
-    """
-    row = []
-    for field in fields:
-      field_type = self.headers.get(field, {}).get("type")
-      if field_type == AttributeInfo.Type.PROPERTY:
-        field_handler = self.attrs.get(field)
-      else:
-        field_handler = self.objects.get(field)
-      value = field_handler.get_value() if field_handler else ""
-      row.append(value or "")
-    return row
-
-
-class ImportRowConverter(RowConverter):
-  pass
-
 
 class ExportRowConverter(RowConverter):
-  pass
+  def __init__(self, block_converter, object_class, headers, **options):
+    super(ExportRowConverter, self).__init__(block_converter, object_class, headers, options)
