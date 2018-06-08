@@ -65,8 +65,10 @@ class RowConverter(object):
 
 
 class ImportRowConverter(RowConverter):
+  """Class for handling row data for import"""
   def __init__(self, block_converter, object_class, headers, index, **options):
-    super(ImportRowConverter, self).__init__(block_converter, object_class, headers, options)
+    super(ImportRowConverter, self).__init__(block_converter, object_class,
+                                             headers, options)
     self.index = index
     self.is_new = True
     self.is_delete = False
@@ -76,7 +78,7 @@ class ImportRowConverter(RowConverter):
     self.row = options.get("row", [])
     self.id_key = ""
     self.line = self.index + self.block_converter.offset + \
-                self.block_converter.BLOCK_OFFSET
+        self.block_converter.BLOCK_OFFSET
     self.initial_state = None
 
   def add_error(self, template, **kwargs):
@@ -106,8 +108,8 @@ class ImportRowConverter(RowConverter):
     handle_fields = self.headers if field_list is None else field_list
     for i, (attr_name, header_dict) in enumerate(self.headers.items()):
       if attr_name not in handle_fields or \
-        attr_name in self.attrs or \
-        self.is_delete:
+         attr_name in self.attrs or \
+         self.is_delete:
         continue
       handler = header_dict["handler"]
       item = handler(self, attr_name, parse=True,
@@ -119,7 +121,7 @@ class ImportRowConverter(RowConverter):
       if not self.ignore:
         if attr_name == "status" and hasattr(self.obj, "DEPRECATED"):
           self.is_deprecated = (
-            self.obj.DEPRECATED == item.value != self.obj.status
+              self.obj.DEPRECATED == item.value != self.obj.status
           )
         if attr_name in ("slug", "email"):
           self.id_key = attr_name
@@ -245,15 +247,15 @@ class ImportRowConverter(RowConverter):
     service_class.model = self.object_class
     if self.is_delete:
       signals.Restful.model_deleted_after_commit.send(
-        self.object_class, obj=self.obj, service=service_class, event=event)
+          self.object_class, obj=self.obj, service=service_class, event=event)
     elif self.is_new:
       signals.Restful.model_posted_after_commit.send(
-        self.object_class, obj=self.obj, src={}, service=service_class,
-        event=event)
+          self.object_class, obj=self.obj, src={}, service=service_class,
+          event=event)
     else:
       signals.Restful.model_put_after_commit.send(
-        self.object_class, obj=self.obj, src={}, service=service_class,
-        event=event)
+          self.object_class, obj=self.obj, src={}, service=service_class,
+          event=event)
 
   def send_before_commit_signals(self, event=None):
     """Send before commit signals for all objects.
@@ -269,8 +271,8 @@ class ImportRowConverter(RowConverter):
     service_class = getattr(ggrc.services, self.object_class.__name__)
     service_class.model = self.object_class
     signals.Restful.model_put_before_commit.send(
-      self.object_class, obj=self.obj, src={}, service=service_class,
-      event=event, initial_state=self.initial_state)
+        self.object_class, obj=self.obj, src={}, service=service_class,
+        event=event, initial_state=self.initial_state)
 
   def send_pre_commit_signals(self):
     """Send before commit signals for all objects.
@@ -286,13 +288,13 @@ class ImportRowConverter(RowConverter):
     service_class.model = self.object_class
     if self.is_delete:
       signals.Restful.model_deleted.send(
-        self.object_class, obj=self.obj, service=service_class)
+          self.object_class, obj=self.obj, service=service_class)
     elif self.is_new:
       signals.Restful.model_posted.send(
-        self.object_class, obj=self.obj, src={}, service=service_class)
+          self.object_class, obj=self.obj, src={}, service=service_class)
     else:
       signals.Restful.model_put.send(
-        self.object_class, obj=self.obj, src={}, service=service_class)
+          self.object_class, obj=self.obj, src={}, service=service_class)
 
   def insert_object(self):
     """Add the row object to the current database session."""
@@ -318,4 +320,5 @@ class ImportRowConverter(RowConverter):
 
 class ExportRowConverter(RowConverter):
   def __init__(self, block_converter, object_class, headers, **options):
-    super(ExportRowConverter, self).__init__(block_converter, object_class, headers, options)
+    super(ExportRowConverter, self).__init__(block_converter, object_class,
+                                             headers, options)
