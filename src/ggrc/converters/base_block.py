@@ -469,7 +469,6 @@ class BlockConverter(object):
       return
     self.row_converters = []
 
-    index = 0
     for ids_pool in list_chunks(self.object_ids, self.ROW_CHUNK_SIZE):
       # sqlalchemy caches all queries and it takes a lot of memory.
       # This line clears query cache.
@@ -481,8 +480,7 @@ class BlockConverter(object):
 
       for obj in objects:
         yield base_row.ExportRowConverter(self, self.object_class, obj=obj,
-                                          headers=self.headers, index=index)
-        index += 1
+                                          headers=self.headers)
 
       # Clear all objects from session (it helps to avoid memory leak)
       for obj in db.session:
