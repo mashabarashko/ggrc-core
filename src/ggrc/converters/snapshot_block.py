@@ -63,10 +63,6 @@ class SnapshotBlockConverter(object):
     self.ids = ids
     self.fields = fields or []
 
-  @staticmethod
-  def handle_row_data():
-    pass
-
   @property
   def name(self):
     return "{} Snapshot".format(self.child_type)
