@@ -14,7 +14,7 @@ from ggrc.utils import structures
 from ggrc.cache.memcache import MemCache
 from ggrc.converters import get_exportables
 from ggrc.converters import import_helper
-from ggrc.converters.base_block import BlockConverter
+from ggrc.converters import base_block
 from ggrc.converters.snapshot_block import SnapshotBlockConverter
 from ggrc.converters.import_helper import extract_relevant_data
 from ggrc.converters.import_helper import split_array
@@ -98,9 +98,14 @@ class ImportConverter(BaseConverter):
       class_name = data[1][0].strip().lower()
       object_class = self.exportable.get(class_name)
       raw_headers, rows = extract_relevant_data(data)
-      block_converter = BlockConverter(self, object_class=object_class,
-                                       rows=rows, raw_headers=raw_headers,
-                                       offset=offset, class_name=class_name)
+      block_converter = base_block.ImportBlockConverter(
+          self,
+          object_class=object_class,
+          rows=rows,
+          raw_headers=raw_headers,
+          offset=offset,
+          class_name=class_name,
+      )
       block_converter.check_block_restrictions()
       self.block_converters.append(block_converter)
 
@@ -173,9 +178,13 @@ class ExportConverter(BaseConverter):
             SnapshotBlockConverter(self, object_ids, fields=fields)
         )
       else:
-        block_converter = BlockConverter(self, object_class=object_class,
-                                         fields=fields, object_ids=object_ids,
-                                         class_name=class_name)
+        block_converter = base_block.ExportBlockConverter(
+            self,
+            object_class=object_class,
+            fields=fields,
+            object_ids=object_ids,
+            class_name=class_name,
+        )
         block_converter.check_block_restrictions()
         self.block_converters.append(block_converter)
 
