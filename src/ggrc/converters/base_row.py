@@ -19,27 +19,33 @@ from ggrc.utils import dump_attrs
 
 class RowConverter(object):
   """Base class for handling row data."""
-
-  def __init__(self, block_converter, object_class, **options):
+  # pylint: disable=too-few-public-methods
+  def __init__(self, block_converter, object_class, headers, options):
     self.block_converter = block_converter
-    self.options = options.copy()
     self.object_class = object_class
+    self.headers = headers
     self.obj = options.get("obj")
-    self.from_ids = self.obj is not None
+    self.attrs = collections.OrderedDict()
+    self.objects = collections.OrderedDict()
+    self.old_values = {}
+
+
+class ImportRowConverter(RowConverter):
+  """Class for handling row data for import"""
+  # pylint: disable=too-many-instance-attributes
+  def __init__(self, block_converter, object_class, headers, index, **options):
+    super(ImportRowConverter, self).__init__(block_converter, object_class,
+                                             headers, options)
+    self.index = index
     self.is_new = True
     self.is_delete = False
     self.is_deprecated = False
     self.do_not_expunge = False
     self.ignore = False
-    self.index = options.get("index", -1)
     self.row = options.get("row", [])
-    self.attrs = collections.OrderedDict()
-    self.objects = collections.OrderedDict()
     self.id_key = ""
-    self.line = self.index + self.block_converter.offset +\
+    self.line = self.index + self.block_converter.offset + \
         self.block_converter.BLOCK_OFFSET
-    self.headers = options.get("headers", [])
-    self.old_values = {}
     self.initial_state = None
 
   def add_error(self, template, **kwargs):
@@ -69,8 +75,8 @@ class RowConverter(object):
     handle_fields = self.headers if field_list is None else field_list
     for i, (attr_name, header_dict) in enumerate(self.headers.items()):
       if attr_name not in handle_fields or \
-              attr_name in self.attrs or \
-              self.is_delete:
+         attr_name in self.attrs or \
+         self.is_delete:
         continue
       handler = header_dict["handler"]
       item = handler(self, attr_name, parse=True,
@@ -89,15 +95,6 @@ class RowConverter(object):
           self.obj = self.get_or_generate_object(attr_name)
           item.set_obj_attr()
       item.check_unique_consistency()
-
-  def handle_obj_row_data(self):
-    for attr_name, header_dict in self.headers.items():
-      handler = header_dict["handler"]
-      item = handler(self, attr_name, **header_dict)
-      if header_dict.get("type") == AttributeInfo.Type.PROPERTY:
-        self.attrs[attr_name] = item
-      else:
-        self.objects[attr_name] = item
 
   def handle_row_data(self, field_list=None):
     """Handle row data on import"""
@@ -176,19 +173,6 @@ class RowConverter(object):
     self.initial_state = dump_attrs(obj)
     return obj
 
-  def setup_secondary_objects(self):
-    """Import secondary objects.
-
-    This function creates and stores all secondary object such as relationships
-    and any linked object that need the original object to be saved before they
-    can be processed. This is usually due to needing the id of the original
-    object that is created with a csv import.
-    """
-    if not self.obj or self.ignore or self.is_delete:
-      return
-    for mapping in self.objects.values():
-      mapping.set_obj_attr()
-
   def setup_object(self):
     """ Set the object values or relate object values
 
@@ -203,29 +187,39 @@ class RowConverter(object):
       if not item_handler.view_only:
         item_handler.set_obj_attr()
 
-  def send_post_commit_signals(self, event=None):
-    """Send after commit signals for all objects
+  def setup_secondary_objects(self):
+    """Import secondary objects.
 
-    This function sends proper signals for all objects depending if the object
-    was created, updated or deleted.
-    Note: signals are only sent for the row objects. Secondary objects such as
-    Relationships do not get any signals triggered.
-    ."""
-    if self.ignore:
+    This function creates and stores all secondary object such as relationships
+    and any linked object that need the original object to be saved before they
+    can be processed. This is usually due to needing the id of the original
+    object that is created with a csv import.
+    """
+    if not self.obj or self.ignore or self.is_delete:
       return
-    service_class = getattr(ggrc.services, self.object_class.__name__)
-    service_class.model = self.object_class
-    if self.is_delete:
-      signals.Restful.model_deleted_after_commit.send(
-          self.object_class, obj=self.obj, service=service_class, event=event)
-    elif self.is_new:
-      signals.Restful.model_posted_after_commit.send(
-          self.object_class, obj=self.obj, src={}, service=service_class,
-          event=event)
-    else:
-      signals.Restful.model_put_after_commit.send(
-          self.object_class, obj=self.obj, src={}, service=service_class,
-          event=event)
+    for mapping in self.objects.values():
+      mapping.set_obj_attr()
+
+  def insert_object(self):
+    """Add the row object to the current database session."""
+    if self.ignore or self.is_delete:
+      return
+
+    if self.is_new:
+      db.session.add(self.obj)
+    for handler in self.attrs.values():
+      handler.insert_object()
+
+  def insert_secondary_objects(self):
+    """Add additional objects to the current database session.
+
+    This is used for adding any extra created objects such as Relationships, to
+    the current session to be committed.
+    """
+    if not self.obj or self.ignore or self.is_delete:
+      return
+    for secondary_object in self.objects.values():
+      secondary_object.insert_object()
 
   def send_before_commit_signals(self, event=None):
     """Send before commit signals for all objects.
@@ -266,26 +260,45 @@ class RowConverter(object):
       signals.Restful.model_put.send(
           self.object_class, obj=self.obj, src={}, service=service_class)
 
-  def insert_object(self):
-    """Add the row object to the current database session."""
-    if self.ignore or self.is_delete:
+  def send_post_commit_signals(self, event=None):
+    """Send after commit signals for all objects
+
+    This function sends proper signals for all objects depending if the object
+    was created, updated or deleted.
+    Note: signals are only sent for the row objects. Secondary objects such as
+    Relationships do not get any signals triggered.
+    ."""
+    if self.ignore:
       return
+    service_class = getattr(ggrc.services, self.object_class.__name__)
+    service_class.model = self.object_class
+    if self.is_delete:
+      signals.Restful.model_deleted_after_commit.send(
+          self.object_class, obj=self.obj, service=service_class, event=event)
+    elif self.is_new:
+      signals.Restful.model_posted_after_commit.send(
+          self.object_class, obj=self.obj, src={}, service=service_class,
+          event=event)
+    else:
+      signals.Restful.model_put_after_commit.send(
+          self.object_class, obj=self.obj, src={}, service=service_class,
+          event=event)
 
-    if self.is_new:
-      db.session.add(self.obj)
-    for handler in self.attrs.values():
-      handler.insert_object()
 
-  def insert_secondary_objects(self):
-    """Add additional objects to the current database session.
+class ExportRowConverter(RowConverter):
+  """Class for handling row data for export"""
+  def __init__(self, block_converter, object_class, headers, **options):
+    super(ExportRowConverter, self).__init__(block_converter, object_class,
+                                             headers, options)
 
-    This is used for adding any extra created objects such as Relationships, to
-    the current session to be committed.
-    """
-    if not self.obj or self.ignore or self.is_delete:
-      return
-    for secondery_object in self.objects.values():
-      secondery_object.insert_object()
+  def handle_obj_row_data(self):
+    for attr_name, header_dict in self.headers.items():
+      handler = header_dict["handler"]
+      item = handler(self, attr_name, **header_dict)
+      if header_dict.get("type") == AttributeInfo.Type.PROPERTY:
+        self.attrs[attr_name] = item
+      else:
+        self.objects[attr_name] = item
 
   def to_array(self, fields):
     """Get an array representation of the current row.
