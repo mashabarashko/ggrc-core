@@ -128,12 +128,13 @@ def handle_cycle_task_created(ctask):
   Args:
     ctask: CycleTask instance
   """
-  notification_types = [get_notif_name_by_wf(ctask.workflow),
-                        "cycle_task_due_today",
-                        "cycle_task_overdue"]
-  notification_type_query = pusher.get_notification_types(*notification_types)
-  notification_types_dict = {t.name: t for t in notification_type_query}
-  for n_type in notification_types:
+  notification_types_names = [get_notif_name_by_wf(ctask.workflow),
+                              "cycle_task_due_today",
+                              "cycle_task_overdue"]
+  notification_types = pusher.get_notification_types(notification_types_names,
+                                                     fields=('name',))
+  notification_types_dict = {t.name: t for t in notification_types}
+  for n_type in notification_types_names:
     pusher.create_notifications_for_objects(notification_types_dict[n_type],
                                             ctask.end_date, *[ctask])
 
@@ -198,7 +199,8 @@ def handle_cycle_created(obj, manually):
   for notification in query:
     exists_notifications[notification.notification_type_id].add(
         notification.object_id)
-  for notification_type in pusher.get_notification_types(*notification_names):
+  notification_types = pusher.get_notification_types(notification_names)
+  for notification_type in notification_types:
     object_ids = exists_notifications[notification_type.id]
     notify_tasks = [t for t in tasks if not (t.id in object_ids or t.is_done)]
     if create_notification == notification_type.name:

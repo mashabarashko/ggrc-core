@@ -7,6 +7,7 @@ from dateutil import relativedelta
 from sqlalchemy import or_
 from sqlalchemy import tuple_
 from sqlalchemy.sql.expression import true
+from sqlalchemy.orm import load_only
 
 from ggrc import db
 from ggrc.models.notification import Notification
@@ -27,8 +28,10 @@ def get_notification_query(*objs, **kwargs):
   )
   notification_names = kwargs.get('notification_names') or []
   if notification_names:
+    notification_types = get_notification_types(notification_names,
+                                                fields=('id',))
     query = query.filter(Notification.notification_type_id.in_([
-        n.id for n in get_notification_types(*notification_names)
+        n.id for n in notification_types
     ]))
   return query
 
@@ -39,12 +42,15 @@ def notification_exists_for(*obj, **kwargs):
   ).scalar()
 
 
-def get_notification_types(*names):
-  return NotificationType.query.filter(NotificationType.name.in_(names)).all()
+def get_notification_types(names, fields=None):
+  query = NotificationType.query.filter(NotificationType.name.in_(names))
+  if fields:
+    query = query.options(load_only(*fields))
+  return query.all()
 
 
 def get_notification_type(name):
-  return get_notification_types(name)[0]
+  return get_notification_types((name,)).first()
 
 
 def push(obj, notif_type, send_on=None, repeating=False):
@@ -76,7 +82,9 @@ def get_notification_context(notification_type, send_at):
 def update_or_create_notifications(obj, send_at, *notification_names):
   today = datetime.datetime.combine(datetime.date.today(),
                                     datetime.datetime.min.time())
-  types = {n.name: n for n in get_notification_types(*notification_names)}
+  notification_types = get_notification_types(notification_names,
+                                              fields=('name',))
+  types = {n.name: n for n in notification_types}
   for notification_name in notification_names:
     notif_type = types[notification_name]
     notification_context = get_notification_context(notif_type, send_at)
