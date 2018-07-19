@@ -2,7 +2,10 @@
 # Licensed under http://www.apache.org/licenses/LICENSE-2.0 <see LICENSE file>
 
 import datetime
+import collections
 from dateutil import relativedelta
+
+import flask
 
 from sqlalchemy import or_
 from sqlalchemy import tuple_
@@ -40,7 +43,12 @@ def notification_exists_for(*obj, **kwargs):
 
 
 def get_notification_types(*names):
-  return NotificationType.query.filter(NotificationType.name.in_(names)).all()
+  if not getattr(flask.g, "notification_types", None):
+    notification_types = NotificationType.query.all()
+    flask.g.notification_types = collections.defaultdict(dict)
+    for notif_type in notification_types:
+      flask.g.notification_types[notif_type.name] = notif_type
+  return [flask.g.notification_types[name] for name in names]
 
 
 def get_notification_type(name):
