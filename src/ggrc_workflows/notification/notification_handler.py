@@ -63,7 +63,6 @@ def done_tasks_notify(tasks):
   """
   if not tasks:
     return
-  pusher.get_notification_query(*tasks).delete(synchronize_session="fetch")
   cycle_tasks_dict = collections.defaultdict(list)
   cycles_dict = {}
   task_ids = []

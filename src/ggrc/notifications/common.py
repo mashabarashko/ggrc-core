@@ -27,6 +27,7 @@ from ggrc.models import Notification
 from ggrc.rbac import permissions
 from ggrc.utils import DATE_FORMAT_US, merge_dict, benchmark
 
+from ggrc_workflows.models import CycleTaskGroupObjectTask
 from ggrc_workflows.notification.data_handler import (
     cycle_tasks_cache, deleted_task_rels_cache, get_cycle_task_data
 )
@@ -281,6 +282,9 @@ def send_daily_digest_notifications():
     str: String containing a simple list of who received the notification.
   """
   # pylint: disable=invalid-name
+  with benchmark("delete notifications for done wf tasks"):
+    delete_done_tasks_notifications()
+
   with benchmark("contributed cron job send_daily_digest_notifications"):
     notif_list, notif_data = get_daily_notifications()
     sent_emails = []
@@ -297,6 +301,17 @@ def send_daily_digest_notifications():
       set_notification_sent_time(notif_list)
 
     return "emails sent to: <br> {}".format("<br>".join(sent_emails))
+
+
+def delete_done_tasks_notifications():
+  """Delete wf notifications for done tasks."""
+  db.session.execute("""
+      DELETE n FROM notifications n
+      INNER JOIN cycle_task_group_object_tasks c
+      ON n.object_id=c.id
+      WHERE c.status='%s'
+  """ % CycleTaskGroupObjectTask.FINISHED)
+  db.session.commit()
 
 
 def set_notification_sent_time(notif_list):
@@ -343,6 +358,9 @@ def show_daily_digest_notifications():
   # pylint: disable=invalid-name
   if not permissions.is_admin():
     raise Forbidden()
+
+  delete_done_tasks_notifications()
+
   _, notif_data = get_daily_notifications()
   for data in notif_data.itervalues():
     data = modify_data(data)
