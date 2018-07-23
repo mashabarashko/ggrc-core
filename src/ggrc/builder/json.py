@@ -228,10 +228,10 @@ class UpdateAttrHandler(object):
     value = value.split('T')[0] if isinstance(value, basestring) else value
 
     try:
-      return datetime.strptime(value, "%Y-%m-%d") if value else None
+      return datetime.strptime(value, "%Y-%m-%d").date() if value else None
     except ValueError:
       try:
-        return datetime.strptime(value, "%m/%d/%Y") if value else None
+        return datetime.strptime(value, "%m/%d/%Y").date() if value else None
       except ValueError as error:
         raise BadRequest(
             'Malformed Date {0} for parameter {1}. '
