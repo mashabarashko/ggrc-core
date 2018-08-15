@@ -178,6 +178,7 @@ class RecordBuilder(object):
     return properties
 
   def get_properties(self, obj):
+    
     """Generate record representation for an object.
 
     Properties should be returned in the following format:
