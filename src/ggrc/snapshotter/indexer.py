@@ -74,6 +74,8 @@ def _get_custom_attribute_dict():
       models.CustomAttributeDefinition.definition_type.in_(
           cadef_klass_names.keys()
       )
+  ).options(
+      orm.undefer('title')
   )
   cads = defaultdict(list)
   for cad in query:
