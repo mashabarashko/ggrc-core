@@ -29,9 +29,10 @@ from ggrc.snapshotter.helpers import create_snapshot_dict
 from ggrc.snapshotter.helpers import create_snapshot_revision_dict
 from ggrc.snapshotter.helpers import get_revisions
 from ggrc.snapshotter.helpers import get_snapshots
-from ggrc.snapshotter.indexer import reindex_pairs
+from ggrc.snapshotter.indexer import reindex_snapshots_task
 
 from ggrc.snapshotter.rules import get_rules
+from google.appengine.ext import deferred
 
 logger = getLogger(__name__)
 
@@ -143,9 +144,9 @@ class SnapshotGenerator(object):
     _, for_update = self.analyze()
     result = self._update(for_update=for_update, event=event,
                           revisions=revisions, _filter=_filter)
-    updated = result.response
+    updated_ids = result.response
     if not self.dry_run:
-      reindex_pairs(updated)
+      deferred.defer(reindex_snapshots_task, updated_ids)
       self._copy_snapshot_relationships()
       self._create_audit_relationships()
     return result
@@ -243,8 +244,10 @@ class SnapshotGenerator(object):
       with benchmark("Snapshot._update.retrieve inserted snapshots"):
         snapshots = get_snapshots(modified_snapshot_keys)
 
+      snapshot_ids = []
       with benchmark("Snapshot._update.create snapshots revision payload"):
         for snapshot in snapshots:
+          snapshot_ids.append(snapshot.id)
           parent = Stub(snapshot.parent_type, snapshot.parent_id)
           context_id = self.context_cache[parent]
           data = create_snapshot_revision_dict("modified", event_id, snapshot,
@@ -253,7 +256,7 @@ class SnapshotGenerator(object):
 
       with benchmark("Insert Snapshot entries into Revision"):
         self._execute(models.Revision.__table__.insert(), revision_payload)
-      return OperationResponse("update", True, for_update, response_data)
+      return OperationResponse("update", True, snapshot_ids, response_data)
 
   def analyze(self):
     """Analyze which snapshots need to be updated and which created"""
@@ -293,21 +296,21 @@ class SnapshotGenerator(object):
     """
     for_create, for_update = self.analyze()
     create, update = None, None
-    created, updated = set(), set()
+    created_ids, updated_ids = set(), set()
 
     if for_update:
       update = self._update(
           for_update=for_update, event=event, revisions=revisions,
           _filter=_filter)
-      updated = update.response
+      updated_ids = update.response
     if for_create:
       create = self._create(for_create=for_create, event=event,
                             revisions=revisions, _filter=_filter)
-      created = create.response
+      created_ids = create.response
 
-    to_reindex = updated | created
+    to_reindex = set(updated_ids) | set(created_ids)
     if not self.dry_run:
-      reindex_pairs(to_reindex)
+      deferred.defer(reindex_snapshots_task, to_reindex)
       self._remove_lost_snapshot_mappings()
       self._copy_snapshot_relationships()
       self._create_audit_relationships()
@@ -331,14 +334,15 @@ class SnapshotGenerator(object):
 
   def create(self, event, revisions, _filter=None):
     """Create snapshots of parent object's neighborhood per provided rules
-    and split in chuncks if there are too many snapshottable objects."""
+    and split in chunks if there are too many snapshottable objects."""
     for_create, _ = self.analyze()
     result = self._create(
         for_create=for_create, event=event,
         revisions=revisions, _filter=_filter)
-    created = result.response
+    db.session.commit()
+    snapshot_ids = result.response
     if not self.dry_run:
-      reindex_pairs(created)
+      deferred.defer(reindex_snapshots_task, snapshot_ids)
       self._copy_snapshot_relationships()
       self._create_audit_relationships()
     return result
@@ -402,9 +406,11 @@ class SnapshotGenerator(object):
       with benchmark("Snapshot._create.retrieve inserted snapshots"):
         snapshots = get_snapshots(for_create)
 
+      snapshot_ids = []
       with benchmark("Snapshot._create.create revision payload"):
         with benchmark("Snapshot._create.create snapshots revision payload"):
           for snapshot in snapshots:
+            snapshot_ids.append(snapshot.id)
             parent = Stub(snapshot.parent_type, snapshot.parent_id)
             context_id = self.context_cache[parent]
             data = create_snapshot_revision_dict("created", event_id, snapshot,
@@ -413,7 +419,7 @@ class SnapshotGenerator(object):
 
       with benchmark("Snapshot._create.write revisions to database"):
         self._execute(models.Revision.__table__.insert(), revision_payload)
-      return OperationResponse("create", True, for_create, response_data)
+      return OperationResponse("create", True, snapshot_ids, response_data)
 
   def _copy_snapshot_relationships(self):
     """Add relationships between snapshotted objects.

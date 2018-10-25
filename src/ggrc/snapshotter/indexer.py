@@ -13,6 +13,7 @@ from sqlalchemy import orm
 
 from ggrc import db
 from ggrc import models
+from ggrc.app import app
 from ggrc.models import all_models
 from ggrc.fulltext.mysql import MysqlRecordProperty as Record
 from ggrc.fulltext import get_indexer
@@ -162,6 +163,11 @@ def reindex_snapshots(snapshot_ids):
     pairs = {Pair.from_4tuple(p) for p in query_chunk}
     reindex_pairs(pairs)
     db.session.commit()
+
+
+def reindex_snapshots_task(snapshot_ids):
+  with app.app_context():
+    reindex_snapshots(snapshot_ids)
 
 
 def delete_records(snapshot_ids):
