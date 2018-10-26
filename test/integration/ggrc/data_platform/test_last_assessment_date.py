@@ -62,6 +62,7 @@ class TestLastAssessmentDate(TestCase):
     self.api = Api()
     self.generator = generator.ObjectGenerator()
     self.client.get("/login")
+    self.init_taskqueue()
     person = models.Person.query.first()
     admin_control = models.AccessControlRole.query.filter_by(
         name="Admin", object_type="Control"

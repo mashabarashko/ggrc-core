@@ -17,6 +17,7 @@ class TestAudit(TestCase):
     super(TestAudit, self).setUp()
     self.api = Api()
     self.gen = generator.ObjectGenerator()
+    self.init_taskqueue()
 
   def generate_control_mappings(self, control):
     """Map Control to several Assessments"""

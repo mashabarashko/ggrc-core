@@ -28,6 +28,7 @@ class TestWithLastAssessmentDate(TestCase, WithQueryApi):
     self.generator = integration.ggrc.generator.ObjectGenerator()
     self.client.get("/login")
     self.api = Api()
+    self.init_taskqueue()
 
     program = factories.ProgramFactory(title="Last Assessment Date")
 

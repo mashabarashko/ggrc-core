@@ -46,6 +46,7 @@ class TestSnapshotIndexing(SnapshotterBaseTestCase):
         'Content-Type': 'application/json',
         "X-Requested-By": "GGRC",
     }
+    self.init_taskqueue()
 
   def test_create_indexing(self):
     """Test that creating objects results in full index"""
@@ -101,7 +102,7 @@ class TestSnapshotIndexing(SnapshotterBaseTestCase):
     ).one()
 
     self.create_audit(program)
-
+    self.client.post("/admin/reindex_snapshots")
     audit = db.session.query(models.Audit).filter(
         models.Audit.title.like("%Snapshotable audit%")).first()
 
@@ -259,7 +260,7 @@ class TestSnapshotIndexing(SnapshotterBaseTestCase):
             "operation": "upsert"
         }
     })
-
+    self.client.post("/admin/reindex_snapshots")
     snapshots = db.session.query(models.Snapshot).all()
 
     records = db.session.query(Record).filter(
@@ -324,7 +325,7 @@ class TestSnapshotIndexing(SnapshotterBaseTestCase):
     ).one()
 
     self.create_audit(program)
-
+    self.client.post("/admin/reindex_snapshots")
     audit = db.session.query(models.Audit).filter(
         models.Audit.title.like("%Snapshotable audit%")).first()
 

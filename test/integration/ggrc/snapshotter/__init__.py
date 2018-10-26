@@ -35,6 +35,7 @@ class SnapshotterBaseTestCase(TestCase):
     super(SnapshotterBaseTestCase, self).setUp()
     self.objgen = integration.ggrc.generator.ObjectGenerator()
     self.api = api_helper.Api()
+    self.init_taskqueue()
 
   def create_object(self, cls, data):
     _, obj = self.objgen.generate_object(cls, data)

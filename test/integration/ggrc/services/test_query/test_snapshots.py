@@ -63,6 +63,7 @@ class TestAuditSnapshotQueries(TestCase, WithQueryApi):
     """Log in before performing queries."""
     self.client.get("/login")
     self.client.post("/admin/full_reindex")
+    self.init_taskqueue()
 
   @classmethod
   def setUpClass(cls):
@@ -411,6 +412,7 @@ class TestIssueRelevantFilter(TestCase, WithQueryApi):
   def setUp(self):
     super(TestIssueRelevantFilter, self).setUp()
     self.client.get("/login")
+    self.init_taskqueue()
 
     self.snapshottable = factories.ObjectiveFactory()
     revision = all_models.Revision.query.filter_by(
@@ -482,6 +484,7 @@ class TestSnapshotIndexing(TestCase, WithQueryApi):
     super(TestSnapshotIndexing, self).setUp()
     self.generator = generator.ObjectGenerator()
     self.client.get("/login")
+    self.init_taskqueue()
 
   def _create_audit(self, program, title):
     """Make a POST to create an Audit.
@@ -510,7 +513,7 @@ class TestSnapshotIndexing(TestCase, WithQueryApi):
     process_nz_prod_id = process_nz_prod.id
 
     self._create_audit(program=program, title="test_process_network_zone")
-
+    self.client.post("/admin/reindex_snapshots")
     process_nz_core_result = self._get_first_result_set(
         self._make_snapshot_query_dict("Process",
                                        expression=["Network Zone", "=",
@@ -621,7 +624,7 @@ class TestSnapshotIndexing(TestCase, WithQueryApi):
       db.session.add(c_rev)
     db.session.commit()
     self._create_audit(program=program, title="some title")
-
+    self.client.post("/admin/reindex_snapshots")
     control_user1_result = self._get_first_result_set(
         self._make_snapshot_query_dict("Control",
                                        expression=["Admin", "=", "Ann"]),
@@ -675,6 +678,7 @@ class TestSnapshotIndexing(TestCase, WithQueryApi):
     datetime_value = getattr(control, field)
     factories.RelationshipFactory(source=program, destination=control)
     self._create_audit(program=program, title="some title")
+    self.client.post("/admin/reindex_snapshots")
     for date_string in self.generate_date_strings(datetime_value):
       for alias in aliases:
         query_dict = self._make_snapshot_query_dict(
@@ -725,7 +729,7 @@ class TestSnapshotIndexing(TestCase, WithQueryApi):
       factories.RelationshipFactory(source=program, destination=control2)
 
     self._create_audit(program=program, title="test_person_ca")
-
+    self.client.post("/admin/reindex_snapshots")
     controls_user1 = self._get_first_result_set(
         self._make_snapshot_query_dict(
             "Control",
@@ -793,6 +797,7 @@ class TestSnapshotIndexing(TestCase, WithQueryApi):
     db.session.commit()
     program = models.Program.query.filter_by(id=program_id).one()
     self._create_audit(program=program, title="some title")
+    self.client.post("/admin/reindex_snapshots")
     control_user1_result = self._get_first_result_set(
         self._make_snapshot_query_dict(
             "Control",
@@ -831,6 +836,7 @@ class TestSnapshotIndexing(TestCase, WithQueryApi):
 
     program = models.Program.query.filter_by(id=program_id).one()
     self._create_audit(program=program, title="some title")
+    self.client.post("/admin/reindex_snapshots")
     category = models.ControlCategory.query.get(category_id)
     control_result = self._get_first_result_set(
         self._make_snapshot_query_dict(

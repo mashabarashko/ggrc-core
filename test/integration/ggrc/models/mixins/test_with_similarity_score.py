@@ -25,6 +25,7 @@ class TestWithSimilarityScore(TestCase):
     super(TestWithSimilarityScore, self).setUp()
     self.obj_gen = integration.ggrc.generator.ObjectGenerator()
     self.client.get("/login")
+    self.init_taskqueue()
 
   @staticmethod
   def make_relationships(source, destinations):
