@@ -8,8 +8,10 @@ import collections
 import functools
 
 from logging import getLogger
-from werkzeug.exceptions import Forbidden, BadRequest, MethodNotAllowed
+import sqlalchemy as sa
 from sqlalchemy.orm.exc import NoResultFound
+
+from werkzeug.exceptions import Forbidden, BadRequest, MethodNotAllowed
 from dateutil import parser as date_parser
 
 from ggrc import db
@@ -21,8 +23,7 @@ from ggrc.services import common
 from ggrc.views import converters
 from ggrc.query import my_objects
 from ggrc.query import builder
-from ggrc.models.person_profile import PersonProfile
-from ggrc.models.person import Person
+from ggrc.models import all_models
 
 
 # pylint: disable=invalid-name
@@ -166,6 +167,7 @@ class PersonResource(common.ExtendedResource):
         None: super(PersonResource, self).get,
         "task_count": self.verify_is_current(self._task_count),
         "my_work_count": self.verify_is_current(self._my_work_count),
+        "my_workflows": self.verify_is_current(self._my_workflows),
         "all_objects_count": self.verify_is_current(self._all_objects_count),
         "imports": self.verify_is_current(converters.handle_import_get),
         "exports": self.verify_is_current(converters.handle_export_get),
@@ -318,6 +320,111 @@ class PersonResource(common.ExtendedResource):
 
       return self.json_success_response(response_object, )
 
+  def _my_workflows(self, id):
+    """Returns workflow statistic for authorized user."""
+    # pylint: disable=invalid-name,redefined-builtin
+    base_query = db.session.query(
+        all_models.Workflow
+    ).join(
+        all_models.AccessControlList,
+        all_models.AccessControlList.object_id == all_models.Workflow.id
+    ).join(
+        all_models.AccessControlPerson,
+        all_models.AccessControlPerson.ac_list_id ==
+        all_models.AccessControlList.id
+    ).join(
+        all_models.AccessControlRole,
+        all_models.AccessControlList.ac_role_id ==
+        all_models.AccessControlRole.id
+    ).join(
+        all_models.Person,
+        all_models.AccessControlPerson.person_id == all_models.Person.id
+    )
+
+    tasks_query = base_query.join(
+        all_models.Cycle,
+        all_models.Workflow.id == all_models.Cycle.workflow_id
+    ).join(
+        all_models.CycleTaskGroupObjectTask,
+        all_models.CycleTaskGroupObjectTask.cycle_id == all_models.Cycle.id
+    ).filter(
+        sa.and_(
+            all_models.AccessControlPerson.person_id == id,
+            all_models.Workflow.status == 'Active',
+            all_models.AccessControlList.object_type == 'Workflow',
+            all_models.AccessControlRole.name == 'Admin',
+        )
+    ).group_by(
+        all_models.Workflow.id
+    ).order_by(
+        "due_date"
+    ).with_entities(
+        all_models.Workflow.id.label("workflow_id"),
+        all_models.Workflow.title.label("workflow_title"),
+        sa.func.min(
+            all_models.CycleTaskGroupObjectTask.end_date).label("due_date"),
+        sa.func.sum(
+            sa.func.IF(
+                sa.or_(
+                    sa.and_(
+                        all_models.Workflow.is_verification_needed ==
+                        sa.true(),
+                        all_models.CycleTaskGroupObjectTask.status.in_(
+                            ['Verified', 'Deprecated']
+                        )),
+                    sa.and_(
+                        all_models.Workflow.is_verification_needed ==
+                        sa.false(),
+                        all_models.CycleTaskGroupObjectTask.status.in_(
+                            ['Finished', 'Deprecated']
+                        ))), 1, 0)
+        ).label("completed"),
+        sa.func.count(all_models.Workflow.id).label("total"),
+        sa.func.sum(
+            sa.func.IF(
+                all_models.CycleTaskGroupObjectTask.end_date <
+                datetime.date.today(), 1, 0)
+        ).label("overdue")
+    )
+    wf_tasks_result = tasks_query.all()
+    workflow_ids = [res.workflow_id for res in wf_tasks_result]
+
+    owners_query = base_query.filter(
+        sa.and_(
+            all_models.Workflow.id.in_(workflow_ids),
+            all_models.Workflow.status == 'Active',
+            all_models.AccessControlList.object_type == 'Workflow',
+            all_models.AccessControlRole.name == 'Admin',
+        )
+    ).group_by(
+        all_models.Workflow.id
+    ).with_entities(
+        all_models.Workflow.id.label("workflow_id"),
+        sa.func.group_concat(all_models.Person.email).label("owners")
+    )
+    owners_result = dict(owners_query.all())
+
+    response_object = {
+        "workflows": []
+    }
+    for row in wf_tasks_result:
+      response_object["workflows"].append({
+          "workflow": {
+              "id": row.workflow_id,
+              "title": row.workflow_title
+          },
+          "owners": owners_result[row.workflow_id].split(","),
+          "task_stat": {
+              "counts": {
+                  "total": int(row.total),
+                  "overdue": int(row.overdue),
+                  "completed": int(row.completed),
+              },
+              "due_in_date": row.due_date
+          }
+      })
+    return self.json_success_response(response_object, )
+
   def _all_objects_count(self, **kwargs):  # pylint: disable=unused-argument
     """Get object counts for all objects page."""
     with benchmark("Make response"):
@@ -346,10 +453,12 @@ class PersonResource(common.ExtendedResource):
         False otherwise. Profile is profile for Person with id=person_id.
       """
     try:
-      profile = PersonProfile.query.filter_by(person_id=person_id).one()
+      profile = all_models.PersonProfile.query.filter_by(
+          person_id=person_id
+      ).one()
     except NoResultFound:
-      person = Person.query.filter_by(id=person_id).one()
-      person.profile = PersonProfile()
+      person = all_models.Person.query.filter_by(id=person_id).one()
+      person.profile = all_models.PersonProfile()
       return (True, person.profile)
     return (False, profile)
 
