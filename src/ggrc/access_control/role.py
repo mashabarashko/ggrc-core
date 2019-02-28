@@ -36,6 +36,7 @@ class AccessControlRole(attributevalidator.AttributeValidator,
   read = db.Column(db.Boolean, nullable=False, default=True)
   update = db.Column(db.Boolean, nullable=False, default=True)
   delete = db.Column(db.Boolean, nullable=False, default=True)
+  map = db.Column(db.Boolean, nullable=False, default=True)
   my_work = db.Column(db.Boolean, nullable=False, default=True)
   mandatory = db.Column(db.Boolean, nullable=False, default=False)
   non_editable = db.Column(db.Boolean, nullable=False, default=False)
