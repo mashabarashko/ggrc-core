@@ -38,6 +38,7 @@ class Role(base.ContextRBAC, Base, Described, db.Model):
         'read': ['Program', 'Control'],
         'update': ['Program', 'Control'],
         'delete': ['Program'],
+        'map': ['Program', 'Control'],
       }
 
   """
@@ -56,7 +57,7 @@ class Role(base.ContextRBAC, Base, Described, db.Model):
     else:
       permissions = json.loads(self.permissions_json) or {}
     # make sure not to omit actions
-    for action in ['create', 'read', 'update', 'delete']:
+    for action in ['create', 'read', 'update', 'delete', 'map']:
       if action not in permissions:
         permissions[action] = []
     return permissions

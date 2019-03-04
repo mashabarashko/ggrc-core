@@ -367,6 +367,7 @@ def load_access_control_list(user, permissions):
       acr.read,
       acr.update,
       acr.delete,
+      acr.map,
   ).filter(
       sa.and_(
           acp.person_id == user.id,
@@ -377,15 +378,20 @@ def load_access_control_list(user, permissions):
       )
   )
 
-  for object_type, object_id, read, update, delete in access_control_list:
-    actions = (("read", read), ("update", update), ("delete", delete))
+  for obj_type, obj_id, read, update, delete, _map in access_control_list:
+    actions = (
+        ("read", read),
+        ("update", update),
+        ("delete", delete),
+        ("map", _map)
+    )
     for action, allowed in actions:
       if not allowed:
         continue
       permissions.setdefault(action, {})\
-          .setdefault(object_type, {})\
+          .setdefault(obj_type, {})\
           .setdefault('resources', set())\
-          .add(object_id)
+          .add(obj_id)
 
 
 def store_results_into_memcache(permissions, cache, key):
@@ -447,7 +453,7 @@ def load_permissions_for(user):
     permissions[action][resource_type][contexts]
                                       [conditions][context][context_conditions]
 
-  'action' is one of 'create', 'read', 'update', 'delete'.
+  'action' is one of 'create', 'read', 'update', 'delete', 'map'.
   'resource_type' is the name of a valid GGRC resource type.
   'contexts' is a list of context_id where the action is allowed.
   'conditions' is a dictionary of 'context_conditions' indexed by 'context'
