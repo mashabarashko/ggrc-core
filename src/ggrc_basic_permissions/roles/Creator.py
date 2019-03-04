@@ -61,7 +61,7 @@ owner_delete = owner_base + [
         "type": "Relationship",
         "terms": {
             "property_name": "source,destination",
-            "action": "update"
+            "action": "map"
         },
         "condition": "relationship",
     },
@@ -84,6 +84,10 @@ owner_delete = owner_base + [
 ]
 
 owner_update = owner_delete + [
+    "PersonProfile",
+]
+
+owner_map = owner_delete + [
     "PersonProfile",
 ]
 
@@ -181,7 +185,7 @@ permissions = {
             "type": "Relationship",
             "terms": {
                 "property_name": "source,destination",
-                "action": "update"
+                "action": "map"
             },
             "condition": "relationship",
         },
@@ -199,4 +203,5 @@ permissions = {
     ],
     "update": owner_update,
     "delete": owner_delete,
+    "map": owner_map,
 }

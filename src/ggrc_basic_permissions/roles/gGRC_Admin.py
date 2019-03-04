@@ -20,5 +20,6 @@ permissions = {
             },
         },
     ],
-    "update": []
+    "update": [],
+    "map": [],
 }

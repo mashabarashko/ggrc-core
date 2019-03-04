@@ -6,7 +6,8 @@
 # pylint: disable=invalid-name
 
 
-from ggrc_basic_permissions.roles.Creator import owner_delete, owner_update
+from ggrc_basic_permissions.roles.Creator import owner_delete, \
+    owner_update, owner_map
 
 
 scope = "System"
@@ -174,7 +175,7 @@ permissions = {
             "type": "Relationship",
             "terms": {
                 "property_name": "source,destination",
-                "action": "update"
+                "action": "map"
             },
             "condition": "relationship",
         },
@@ -195,4 +196,5 @@ permissions = {
     ],
     "update": owner_update,
     "delete": owner_delete,
+    "map": owner_map,
 }
