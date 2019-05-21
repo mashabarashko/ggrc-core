@@ -361,12 +361,10 @@ def load_access_control_list(user, permissions):
       FROM
           access_control_list AS acl_propagated,
           access_control_roles,
-          access_control_people,
-          access_control_list AS acl_base
+          access_control_people
       WHERE
           access_control_people.person_id = :user_id
-              AND access_control_people.ac_list_id = acl_base.id
-              AND acl_base.id = acl_propagated.base_id
+              AND access_control_people.ac_list_id = acl_propagated.base_id
               AND acl_propagated.ac_role_id = access_control_roles.id {}
   """.format(_get_acl_filter("acl_propagated"))), {"user_id": user.id})
 
