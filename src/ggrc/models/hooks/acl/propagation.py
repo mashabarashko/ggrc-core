@@ -196,9 +196,13 @@ def _get_child_ids(parent_ids):
   """
   acl_table = all_models.AccessControlList.__table__
 
-  return sa.select([acl_table.c.id]).where(
-      acl_table.c.parent_id.in_(parent_ids)
-  )
+  children = db.session.execute(
+      sa.select([acl_table.c.id]).where(
+          acl_table.c.parent_id.in_(parent_ids)
+      )
+  ).fetchall()
+
+  return [child.id for child in children]
 
 
 def _handle_propagation_parents(parent_acl_ids, user_id):
@@ -271,10 +275,7 @@ def _propagate(parent_acl_ids, user_id):
 
     child_ids = _handle_acl_step(parent_acl_ids, user_id)
 
-    count_query = child_ids.alias("counts").count()
-    child_id_count = db.session.execute(count_query).scalar()
-
-    if child_id_count:
+    if child_ids:
       parent_acl_ids = child_ids
     else:
       # Exit the loop when there are no more ACL entries to propagate
