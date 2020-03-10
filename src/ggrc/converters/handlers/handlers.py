@@ -432,10 +432,10 @@ class DateColumnHandler(ColumnHandler):
 
   def _check_errors_non_importable_objects(self, object_date, import_date):
     """Check whether a warning should be ejected"""
-    if not import_date:
+    if self.is_value_empty(import_date):
       return
 
-    if object_date:
+    if not self.is_value_empty(object_date):
       try:
         import_date = datetime.strptime(import_date, "%Y-%m-%d")
       except ValueError:
@@ -469,6 +469,10 @@ class DateColumnHandler(ColumnHandler):
       return True
     return False
 
+  def is_value_empty(self, value):
+    """Check if value is empty."""
+    return bool(self.value_explicitly_empty(value)) or value == ""
+
 
 class NullableDateColumnHandler(DateColumnHandler):
   """Nullable date column handler."""
@@ -477,9 +481,26 @@ class NullableDateColumnHandler(DateColumnHandler):
 
   def parse_item(self):
     """Datetime column can be nullable."""
-    if not self.value_explicitly_empty(self.raw_value) and \
-            self.raw_value != "":
+
+    old_value = self.get_value()
+
+    empty_old_value = self.is_value_empty(old_value)
+    empty_row_value = self.is_value_empty(self.raw_value)
+    is_value_changed = not empty_old_value and empty_row_value
+
+    if not empty_row_value:
       return super(NullableDateColumnHandler, self).parse_item()
+
+    if self.view_only:
+      if is_value_changed:
+        self.add_warning(
+            errors.EXPORT_ONLY_WARNING, column_name=self.display_name
+        )
+        return
+
+      if not empty_old_value:
+        return super(NullableDateColumnHandler, self).parse_item()
+
     if self.mandatory:
       self.add_error(
           errors.MISSING_COLUMN, s="", column_names=self.display_name

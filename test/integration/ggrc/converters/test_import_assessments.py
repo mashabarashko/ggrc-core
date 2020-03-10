@@ -1878,6 +1878,176 @@ class TestAssessmentImport(TestCase):
 
     self._check_csv_response(response, expected_messages)
 
+  @ddt.data(
+      (
+          "2039-12-19",
+          "finished_date",
+          ("Finished Date", "2039-12-19"),
+      ),
+      (
+          None,
+          "finished_date",
+          ("Finished Date", ""),
+      ),
+      (
+          None,
+          "finished_date",
+          ("Finished Date", "--"),
+      ),
+      (
+          "2039-12-19",
+          "end_date",
+          ("Last Deprecated Date", "2039-12-19"),
+      ),
+      (
+          None,
+          "end_date",
+          ("Last Deprecated Date", ""),
+      ),
+      (
+          None,
+          "end_date",
+          ("Last Deprecated Date", "--"),
+      ),
+      (
+          "2039-12-19",
+          "verified_date",
+          ("Verified Date", "2039-12-19"),
+      ),
+      (
+          None,
+          "verified_date",
+          ("Verified Date", ""),
+      ),
+      (
+          None,
+          "verified_date",
+          ("Verified Date", "--"),
+      )
+  )
+  @ddt.unpack
+  def test_assessment_view_only_wo_warnings(self, old_value,
+                                            assessement_attr,
+                                            view_only_column):
+    """ Test {1} ('{0}' => '{2[1]}') import without warnings."""
+    with factories.single_commit():
+      assessment = factories.AssessmentFactory()
+      setattr(assessment, assessement_attr, old_value)
+
+    assessment_data = collections.OrderedDict([
+        ("object_type", "Assessment"),
+        ("Code*", assessment.slug),
+        ("Audit*", assessment.audit.slug),
+        view_only_column,
+    ])
+
+    result = self.import_data(assessment_data)
+
+    expected_error = {
+        "Assessment": {
+            "row_warnings": []
+        }
+    }
+
+    self._check_csv_response(result, expected_error)
+
+  @ddt.data(
+      (
+          "2039-12-19",
+          "finished_date",
+          ("Finished Date", "12/05/2077"),
+      ),
+      (
+          "2039-12-19",
+          "finished_date",
+          ("Finished Date", ""),
+      ),
+      (
+          "2039-12-19",
+          "finished_date",
+          ("Finished Date", "--"),
+      ),
+      (
+          "",
+          "finished_date",
+          ("Finished Date", "2084-12-19"),
+      ),
+      (
+          None,
+          "finished_date",
+          ("Finished Date", "2084-12-19"),
+      ),
+      (
+          "2039-12-19",
+          "end_date",
+          ("Last Deprecated Date", "12/05/2077"),
+      ),
+      (
+          "",
+          "end_date",
+          ("Last Deprecated Date", "2084-12-19"),
+      ),
+      (
+          None,
+          "end_date",
+          ("Last Deprecated Date", "2084-12-19"),
+      ),
+      (
+          "2039-12-19",
+          "verified_date",
+          ("Verified Date", "12/05/2077"),
+      ),
+      (
+          "2039-12-19",
+          "verified_date",
+          ("Verified Date", ""),
+      ),
+      (
+          "2039-12-19",
+          "verified_date",
+          ("Verified Date", "--"),
+      ),
+      (
+          "",
+          "verified_date",
+          ("Verified Date", "2084-12-19"),
+      ),
+      (
+          None,
+          "verified_date",
+          ("Verified Date", "2084-12-19"),
+      )
+  )
+  @ddt.unpack
+  def test_assessment_view_only_w_warnings(self, old_value, assessment_attr,
+                                           view_only_column):
+    """ Test {1} ('{0}' => '{2[1]}') import with warnings."""
+    with factories.single_commit():
+      assessment = factories.AssessmentFactory()
+      setattr(assessment, assessment_attr, old_value)
+
+    assessment_data = collections.OrderedDict([
+        ("object_type", "Assessment"),
+        ("Code*", assessment.slug),
+        ("Audit*", assessment.audit.slug),
+        view_only_column,
+    ])
+
+    result = self.import_data(assessment_data)
+
+    expected_error = {
+        "Assessment": {
+            "row_warnings": {
+                errors.EXPORT_ONLY_WARNING.format(
+                    line=3,
+                    column_name=view_only_column[0],
+                )
+            }
+        }
+    }
+
+    self._check_csv_response(result, expected_error)
+
 
 @ddt.ddt
 class TestAssessmentExport(TestCase):

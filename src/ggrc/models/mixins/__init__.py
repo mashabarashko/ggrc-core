@@ -358,6 +358,7 @@ class FinishedDate(object):
       "finished_date": {
           "display_name": "Finished Date",
           "description": "Automatically provided values",
+          "view_only": True
       }
   }
 
@@ -426,6 +427,7 @@ class VerifiedDate(object):
       "verified_date": {
           "display_name": "Verified Date",
           "description": "Automatically provided values",
+          "view_only": True,
       }
   }
 
