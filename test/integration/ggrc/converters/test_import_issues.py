@@ -9,6 +9,7 @@ from collections import OrderedDict
 import ddt
 
 from ggrc import models
+from ggrc import db
 from ggrc.converters import errors
 
 from integration.ggrc.models import factories
@@ -267,3 +268,68 @@ class TestImportIssues(TestCase):
         }
     }
     self._check_csv_response(response, expected_errors)
+
+
+@ddt.ddt
+class TestImportIssuesMap(TestCase):
+  """Basic Issue import tests."""
+
+  def setUp(self):
+    """Set up for Issue test cases."""
+    super(TestImportIssuesMap, self).setUp()
+    self.client.get("/login")
+
+  @ddt.data(
+      ('Audit', 'audit'),
+      ('Assessment', 'assessment'),
+      ('AccessGroup', 'access group'),
+      ('AccountBalance', 'account balance'),
+      ('Audit', 'audit'),
+      ('Contract', 'contract'),
+      ('Control', 'control'),
+      ('CycleTaskGroupObjectTask', 'cycle task group object task'),
+      ('DataAsset', 'data asset'),
+      ('Facility', 'facility'),
+      ('Issue', 'issue'),
+      ('KeyReport', 'key report'),
+      ('Market', 'market'),
+      ('Metric', 'metric'),
+      ('Objective', 'objective'),
+      ('OrgGroup', 'org group'),
+      ('Policy', 'policy'),
+      ('Process', 'process'),
+      ('Product', 'product'),
+      ('ProductGroup', 'product group'),
+      ('Program', 'program'),
+      ('Project', 'project'),
+      ('Regulation', 'regulation'),
+      ('Requirement', 'requirement'),
+      ('Risk', 'risk'),
+      ('Standard', 'standard'),
+      ('System', 'system'),
+      ('TechnologyEnvironment', 'technology environment'),
+      ('Threat', 'threat'),
+      ('Vendor', 'vendor')
+  )
+  @ddt.unpack
+  def test_import_issue_with_mapping(self, map_name, map_obj):
+    """Test map map_obj to issue via import"""
+    map_obj = "map:" + map_obj
+    with factories.single_commit():
+      mapping_obj = factories.get_model_factory(map_name)()
+      issue = factories.IssueFactory()
+    response = self.import_data(OrderedDict([
+        ("object_type", "Issue"),
+        ("Code*", issue.slug),
+        ("Title", issue.title),
+        ("Admin*", "user@example.com"),
+        ("Due Date*", issue.due_date),
+        (map_obj, mapping_obj.slug),
+    ]))
+    self._check_csv_response(response, {})
+    relationship = db.session.query(models.all_models.Relationship).first()
+    self.assertTrue(relationship)
+    self.assertTrue(relationship.source_id, issue.id)
+    self.assertTrue(relationship.source_type, "Issue")
+    self.assertTrue(relationship.destination_id, mapping_obj.id)
+    self.assertTrue(relationship.destination_type, map_name)

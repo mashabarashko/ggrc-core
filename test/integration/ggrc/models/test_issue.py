@@ -55,6 +55,33 @@ class TestIssue(TestCase):
     self.assertEqual(statuses, {"Fixed", "Fixed and Verified"})
 
 
+class TestIssueMapUnmap(TestCase):
+  """Test Issue map/unmap Audit."""
+
+  def setUp(self):
+    super(TestIssueMapUnmap, self).setUp()
+    self.api = Api()
+    with factories.single_commit():
+      factories.AuditFactory()
+      factories.IssueFactory()
+
+  def test_is_allow_map_to_audit(self):
+    """Test of allow_map_to_audit function"""
+    issue = all_models.Issue.query.first()
+    result = self.api.get(all_models.Issue, issue.id)
+    result = result.json[u'issue'][u"allow_map_to_audit"]
+    self.assertTrue(result)
+
+  def test_is_allow_unmap_from_audit(self):
+    """Test of allow_unmap_from_audit function"""
+    issue = all_models.Issue.query.first()
+    audit = all_models.Audit.query.first()
+    factories.RelationshipFactory(source=audit, destination=issue)
+    result = self.api.get(all_models.Issue, issue.id)
+    result = result.json[u'issue'][u'allow_unmap_from_audit']
+    self.assertTrue(result)
+
+
 class TestIssueDueDate(TestCase):
   """Test suite to test Due Date of Issue"""
 
